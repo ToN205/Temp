@@ -1,99 +1,61 @@
-#include "CommonFunc.h"
-#include "BaseObject.h"
-#include "gamemap.h"
-#include "MainObject.h"
-#include "ImpTimer.h"
-BaseObject g_background;
-bool InitData(){
-    bool success = true;
-    int ret = SDL_Init(SDL_INIT_VIDEO);
-    if(ret < 0) return false;
-    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
-    g_window = SDL_CreateWindow("Game cpp SDL",
-                                SDL_WINDOWPOS_UNDEFINED,
-                                SDL_WINDOWPOS_UNDEFINED,
-                                SCREEEN_WIDTH, SCREEN_HEIGHT,
-                                SDL_WINDOW_SHOWN);
-    if(g_window == NULL){
-        success = false;
-    }
-    else{
-        g_screen = SDL_CreateRenderer(g_window, -1, SDL_RENDERER_ACCELERATED);
-        if(g_screen == NULL){
-            success = false;
-        }
-        else{
-            SDL_SetRenderDrawColor(g_screen, RENDER_DRAW_COLOR, RENDER_DRAW_COLOR, RENDER_DRAW_COLOR, RENDER_DRAW_COLOR);
-            int imgFlags = IMG_INIT_PNG;
-            if(IMG_Init(imgFlags) == 0){
-                success = false;
-            }
-        }
-    }
-    return success;
-}
-bool loadBackgound(){
-    bool ret = g_background.LoadImg("background.png", g_screen);
-    if(!ret){
-        return false;
-    }
-    return true;
-}
-void close(){
-    SDL_DestroyRenderer(g_screen);
-        g_screen = NULL;
-        SDL_DestroyWindow(g_window);
-        g_window = NULL;
-        IMG_Quit();
-        SDL_Quit();
+#include"include.h"
+#include"TextObject.h"
+#include"BaseObject.h"
+#include"Dot.h"
 
-}
-int main(int argc, char* args []) {
-    ImpTimer fps_timer;
-    if(!InitData()){
-        return -1;
-    }
-    if(!loadBackgound()){
-        return -1;
-    }
-    GameMap game_map;
-    game_map.LoadMap("map/map01.txt");
-    game_map.LoadTiles(g_screen);
+bool OnInit();
+void close();
+bool LoadMedia();
+void TimeCounter();
+void titleScreen();
+void Settings();
 
-    MainObject p_player;
-    p_player.LoadImg("Run.png", g_screen);
-    p_player.set_clip();
+bool ret = OnInit();
 
-    bool is_quit = false;
-    while(!is_quit){
-        fps_timer.start();
-        while(SDL_PollEvent(&g_event) != 0){
-            if(g_event.type == SDL_QUIT){
-                is_quit = true;
-            }
-            p_player.HandelIputAction(g_event, g_screen);
-        }
-        SDL_SetRenderDrawColor(g_screen, RENDER_DRAW_COLOR,RENDER_DRAW_COLOR, RENDER_DRAW_COLOR, RENDER_DRAW_COLOR);
-        SDL_RenderClear(g_screen);
-        g_background.Render(g_screen, nullptr);
+TTF_Font* font40 = TTF_OpenFont("imageSDL/font.ttf",40);
+TTF_Font* titlefont = TTF_OpenFont("imageSDL/FzLongBeach.ttf",150);
+TTF_Font* g_font_setting = TTF_OpenFont("imageSDL/SSWB.ttf",40);
+Mix_Music* menu_music = Mix_LoadMUS("imageSDL/menu_music.mp3");
+Mix_Chunk* select_menu_effect = Mix_LoadWAV("imageSDL/selected_sound_effects.mp3");
+Mix_Chunk* start_effect = Mix_LoadWAV("imageSDL/interface-124464.mp3");
+Mix_Chunk* tick_effect = Mix_LoadWAV("imageSDL/medium.wav");
 
+#define MenuOption 3
 
-        Map map_data = game_map.getMap();
-        p_player.SetMapXY(map_data.start_x_, map_data.start_y_);
-        p_player.DoPlayer(map_data);
-        p_player.Show(g_screen);
+BaseObject gBackground, SettingPanel;
+TextObject SettingChoice[5];
+TextObject TitleGame, TitleChoice[MenuOption];
 
-        game_map.SetMap(map_data);
-        game_map.DrawMap(g_screen);
-        SDL_RenderPresent(g_screen);
+bool IsRunning = true;
+bool Music_On = true;
+bool Sound_On = true;
+SDL_Event e;
+int scrolling = 0;
+int state = 0; //0: title screen, 1: in game, 2: Settings, 3: end;
+int selectedMenu = 0;
 
-        int real_imp_time = fps_timer.get_ticks();
-        int time_one_frame = 1000/PRAME_PER_SECOND;
-
-        if(real_imp_time < time_one_frame){
-            int delay_time = time_one_frame - real_imp_time;
-            if(delay_time >= 0) {
-                SDL_Delay(delay_time);
+int main(int argc, char* argv[])
+{
+    if (LoadMedia())
+    {
+        while (IsRunning)
+        {
+            switch (state)
+            {
+            case 0: titleScreen(); break;
+            case 1:
+                SDL_SetRenderDrawColor(gRenderer, 0xFF, 0xFF, 0xFF, 0xFF);
+                SDL_RenderClear(gRenderer);
+                gBackground.SetRect(0,0);
+                gBackground.Render(gRenderer);
+                while (SDL_PollEvent(&e) > 0) {
+                    if (e.type == SDL_QUIT)
+                        IsRunning = false;
+                }
+                SDL_RenderPresent(gRenderer);
+                break;
+            case 2: Settings(); break;
+            case 3: IsRunning = false; break;
             }
         }
     }
@@ -101,3 +63,291 @@ int main(int argc, char* args []) {
     return 0;
 }
 
+bool LoadMedia()
+{
+    TitleGame.SetText("Contra");
+    TitleChoice[0].SetText("     Start    ");
+    TitleChoice[1].SetText("    Setting   ");
+    TitleChoice[2].SetText("     Quit     ");
+    TitleGame.SetColor(TextObject::ORANGE_TEXT);
+    TitleGame.LoadFromRenderText(titlefont,gRenderer);
+
+    SettingChoice[0].SetText("Music");
+    SettingChoice[1].SetText("Sound");
+    SettingChoice[2].SetText("Back");
+
+    gBackground.LoadImg("imageSDL/background.png",gRenderer);
+    SettingPanel.LoadImg("imageSDL/settings.png",gRenderer);
+    for (int i=3; i<5; ++i) {
+        SettingChoice[i].LoadImg("imageSDL/boxX.png",gRenderer);
+    }
+
+    SettingPanel.SetRect(193,72);
+    SettingChoice[0].SetRect(430,418);
+    SettingChoice[1].SetRect(650,418);
+    SettingChoice[2].SetRect(582,568);
+    SettingChoice[3].SetRect(570,398);
+    SettingChoice[4].SetRect(800,398);
+
+    return true;
+}
+
+bool OnInit()
+{
+    bool success = true;
+    if (SDL_Init(SDL_INIT_EVERYTHING)<0) {
+        printf("Could not initialize SDL! %s\n", SDL_GetError());
+        success = false;
+    } else {
+        gWindow = SDL_CreateWindow("SDL Learning", SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
+        if (gWindow == NULL) {
+            printf("Failed to create Window! %s\n", SDL_GetError());
+            success = false;
+        } else{
+            gRenderer = SDL_CreateRenderer(gWindow,-1,SDL_RENDERER_ACCELERATED|SDL_RENDERER_PRESENTVSYNC);
+            if (gRenderer == NULL){
+                printf("Failed to create Renderer! %s\n", SDL_GetError());
+            }
+            else {
+                SDL_SetRenderDrawColor( gRenderer, 0xFF, 0xFF, 0xFF, 0xFF );
+                SDL_RenderClear(gRenderer);
+
+				int imgFlags = IMG_INIT_PNG;
+				if( !( IMG_Init( imgFlags ) & imgFlags ) ) {
+					printf( "SDL_image could not initialize! SDL_image Error: %s\n", IMG_GetError() );
+					success = false;
+                }
+				if (TTF_Init() == -1) {
+                    success = false;
+                    printf("Failed to initialize SDL TTF!\n");
+				}
+				if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 1048) < 0)
+                {
+                    printf( "SDL_mixer could not initialize! SDL_mixer Error: %s\n", Mix_GetError() );
+                    success = false;
+                }
+            }
+        }
+    }
+    return success;
+}
+
+/*void TimeCounter()
+{
+    string str_time = "Time: ";
+    Uint32 time_val = SDL_GetTicks()/1000;
+    string str_val = to_string(time_val);
+    str_time += str_val;
+    time_game_.SetText(str_time);
+    time_game_.LoadFromRenderText(font40,gRenderer);
+} */
+
+void titleScreen()
+{
+    if (Music_On && Mix_PlayingMusic() == 0)
+    {
+        Mix_PlayMusic(menu_music,-1);
+    }
+
+    --scrolling;
+    if (scrolling < -gBackground.GetRect().w) scrolling = 0;
+
+    gBackground.SetRect(scrolling,0);
+    gBackground.Render(gRenderer);
+    gBackground.SetRect(scrolling+gBackground.GetRect().w,0);
+    gBackground.Render(gRenderer);
+
+
+    TitleGame.LoadFromRenderText(titlefont,gRenderer);
+    for (int i=0 ; i<MenuOption; ++i) {
+        if (i == selectedMenu)
+        {
+            TitleChoice[i].LoadFromRenderTextShaded(font40,gRenderer);
+        }
+        else
+        {
+            TitleChoice[i].LoadFromRenderText(font40, gRenderer);
+        }
+    }
+    TitleGame.RenderText(gRenderer,(SCREEN_WIDTH-TitleGame.GetRect().w)/2,50);
+
+    int height = 70 + TitleGame.GetRect().h;
+    for (int i=0; i<MenuOption; ++i)
+    {
+        TitleChoice[i].RenderText(gRenderer,(SCREEN_WIDTH-TitleChoice[i].GetRect().w)/2,height);
+        height += TitleChoice[i].GetRect().h;
+    }
+    SDL_RenderPresent(gRenderer);
+
+    while (SDL_PollEvent(&e) > 0)
+    {
+        if (e.type == SDL_QUIT) IsRunning = false;
+        else if (e.type == SDL_KEYDOWN) {
+            switch (e.key.keysym.sym)
+            {
+            case SDLK_UP:
+                if (Sound_On) {
+                    Mix_PlayChannel(-1,select_menu_effect,0);
+                }
+                TitleChoice[selectedMenu].SetColor(TextObject::BLACK_TEXT);
+                selectedMenu--;
+                if (selectedMenu < 0) selectedMenu = MenuOption-1;
+                TitleChoice[selectedMenu].SetColor(TextObject::WHITE_TEXT);
+                break;
+            case SDLK_DOWN:
+                if (Sound_On) {
+                    Mix_PlayChannel(-1, select_menu_effect,0);
+                }
+                TitleChoice[selectedMenu].SetColor(TextObject::BLACK_TEXT);
+                selectedMenu++;
+                if (selectedMenu == MenuOption) selectedMenu = 0;
+                TitleChoice[selectedMenu].SetColor(TextObject::WHITE_TEXT);
+                break;
+            case SDLK_RETURN:
+                if (Sound_On) {
+                    Mix_PlayChannel(-1,start_effect,0);
+                }
+                SDL_Delay(500);
+                switch (selectedMenu)
+                {
+                case 0: state = 1; break;
+                case 1: state = 2; break;
+                case 2: state = 3; break;
+                }
+                break;
+            }
+        }
+    }
+}
+
+void titleScreen2()
+{
+    int xm = 0, ym = 0;
+    if (Mix_PlayingMusic() == 0)
+    {
+        Mix_PlayMusic(menu_music,0);
+    }
+    while (SDL_PollEvent(&e) > 0)
+    {
+        switch (e.type)
+        {
+            case SDL_QUIT: IsRunning = false; break;
+            case SDL_MOUSEMOTION:
+                xm = e.motion.x;
+                ym = e.motion.y;
+                for (int i=0; i<MenuOption; ++i)
+                {
+                    if (TitleChoice[i].CheckFocus(xm,ym))
+                    {
+                        if (selectedMenu != i) {
+                            selectedMenu = i;
+                            Mix_PlayChannel(-1,select_menu_effect,0);
+                        }
+                        TitleChoice[i].LoadFromRenderTextShaded(font40,gRenderer);
+                    }
+                    else {
+                        TitleChoice[i].LoadFromRenderText(font40,gRenderer);
+                    }
+                }
+                break;
+        }
+    }
+}
+
+void Settings()
+{
+    int xm = 0, ym = 0;
+
+    while (SDL_PollEvent(&e) > 0) {
+        switch (e.type)
+        {
+            case SDL_QUIT: IsRunning = false; break;
+            case SDL_MOUSEMOTION:
+                xm = e.motion.x; ym = e.motion.y;
+                if (SettingChoice[2].CheckFocus(xm,ym)) {
+                    SettingChoice[2].SetColor(TextObject::RED_TEXT);
+                    if (Sound_On) {
+                        Mix_PlayChannel(-1,select_menu_effect,0);
+                    }
+                } else SettingChoice[2].SetColor(TextObject::BLACK_TEXT);
+                break;
+            case SDL_MOUSEBUTTONDOWN:
+                xm = e.button.x; ym = e.button.y;
+                for (int i=2; i<=4; ++i)
+                {
+                    if (SettingChoice[i].CheckFocus(xm,ym)) {
+                        switch (i)
+                        {
+                            case 2: state = 0; break;
+                            case 3:
+                                if (Music_On) {
+                                    Music_On = false;
+                                    SettingChoice[3].LoadImg("imageSDL/box.png",gRenderer);
+                                    Mix_PauseMusic();
+                                }
+                                else {
+                                    Music_On = true;
+                                    SettingChoice[3].LoadImg("imageSDL/boxX.png",gRenderer);
+                                    Mix_ResumeMusic();
+                                }
+                                break;
+                            case 4:
+                                if (Sound_On) {
+                                    Sound_On = false;
+                                    SettingChoice[4].LoadImg("imageSDL/box.png",gRenderer);
+                                }
+                                else {
+                                    Sound_On = true;
+                                    SettingChoice[4].LoadImg("imageSDL/boxX.png",gRenderer);
+                                }
+                                break;
+                        }
+                        if (Sound_On) Mix_PlayChannel(-1, tick_effect, 0);
+                    }
+                }
+        }
+    }
+
+    SDL_SetRenderDrawColor(gRenderer, 0xFF, 0xFF, 0xFF, 0xFF);
+    SDL_RenderClear(gRenderer);
+
+    for (int i=0; i<3; ++i) {
+        SettingChoice[i].LoadFromRenderText(g_font_setting,gRenderer);
+    }
+
+    gBackground.SetRect(0,0);
+    gBackground.Render(gRenderer);
+    SettingPanel.Render(gRenderer);
+    for (int i=0; i<5; ++i)
+    {
+        SettingChoice[i].Render(gRenderer);
+    }
+    SDL_RenderPresent(gRenderer);
+}
+
+void close()
+{
+	Mix_FreeChunk(select_menu_effect);
+	Mix_FreeMusic(menu_music);
+	Mix_FreeChunk(start_effect);
+	Mix_FreeChunk(tick_effect);
+
+	TTF_CloseFont(font40);
+	TTF_CloseFont(titlefont);
+	TTF_CloseFont(g_font_setting);
+
+    TitleGame.free();
+    for (int i=0; i<MenuOption; ++i) TitleChoice[i].free();
+    gBackground.free();
+    SettingPanel.free();
+    for (int i=0; i<5; ++i) SettingChoice[i].free();
+
+	SDL_DestroyRenderer( gRenderer );
+	SDL_DestroyWindow( gWindow );
+	gWindow = NULL;
+	gRenderer = NULL;
+
+	IMG_Quit();
+	TTF_Quit();
+	SDL_Quit();
+}
