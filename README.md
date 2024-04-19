@@ -5,9 +5,8 @@ Các thành viên tham gia xây dựng:
      MSSV: 23020144
   2. Họ tên: Đặng Anh Tôn
      MSSV: 23020146
-Bài tập lớn:
-  Game "Mission Impossible"
-  Mô tả: game lập trình bằng ngôn ngứ C++ và sử dụng thư viện SDL 2.0
+Bài tập lớn Game "Mission Impossible"
+Mô tả: game lập trình bằng ngôn ngứ C++ và sử dụng thư viện SDL 2.0
   Game lấy cảm hứng game "Contra", người chơi điều khiển nhân vật chiến đấu lại kẻ địch,
 Game bổ trợ thêm các hiệu ứng âm thanh và hình ảnh sống động.
 
